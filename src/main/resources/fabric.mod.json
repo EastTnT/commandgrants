@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "commandgrants",
+  "version": "${version}",
+  "name": "CommandGrants",
+  "description": "Lets the host/admin open selected commands to selected players while the world keeps cheats disabled.",
+  "authors": [
+    "CommandGrants"
+  ],
+  "contact": {},
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.example.commandgrants.CommandGrantsMod"
+    ],
+    "client": [
+      "com.example.commandgrants.client.CommandGrantsClient"
+    ]
+  },
+  "mixins": [
+    "commandgrants.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=25"
+  }
+}

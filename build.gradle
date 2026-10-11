@@ -1,0 +1,214 @@
+plugins {
+    id 'java'
+    // NOTE: the plugin id has to be declared inside the `plugins { }` block of this build
+    // script, with its version. Declaring the version only in `settings.gradle` and applying
+    // it with `apply plugin:` fails ("Plugin with id 'net.fabricmc.fabric-loom' not found").
+    //
+    // The alias resolves to `net.fabricmc.loom.LoomNoRemapGradlePlugin`, which applies
+    // `fabric-loom` (the regular Loom plugin) internally. Because Minecraft 26.1+ ships
+    // unobfuscated, that plugin registers itself in *non-remap* mode here: it deliberately
+    // does NOT create the `modImplementation` / `modApi` configurations (nothing needs
+    // remapping), but it does add `implementation` to `modCompileClasspath` /
+    // `modCompileClasspathMapped`, so plain `implementation` is the correct dependency scope.
+    //
+    // Also: `officialMojangMappings()` is rejected in this mode with
+    // "Cannot use Mojang mappings in a non-obfuscated environment", so no mappings may be
+    // declared at all.
+    id 'net.fabricmc.fabric-loom' version '1.18.2'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    // Loom adds Fabric + Mojang + Maven Central itself; this is an extra safety net.
+    maven { url = 'https://maven.aliyun.com/repository/public' }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 25
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.fabric_loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+processResources {
+    inputs.property 'version', project.version
+    inputs.property 'loader_version', project.fabric_loader_version
+    inputs.property 'minecraft_version', project.minecraft_version
+
+    filesMatching('fabric.mod.json') {
+        expand(
+            'version': project.version,
+            'loader_version': project.fabric_loader_version,
+            'minecraft_version': project.minecraft_version
+        )
+    }
+}
+
+tasks.named('jar') {
+    from('LICENSE') {
+        rename { "${it}_${project.base.archivesName.get()}" }
+    }
+}
+
+test {
+    useJUnitPlatform()
+}
+
+/*
+ * WORKAROUND: Loom 1.18.2 writes an empty `minecraft-merged.jar` for 26.2.
+ *
+ * Loom's `MinecraftJarMerger` produces a 22-byte archive (a bare ZIP end-of-central-directory) and
+ * reports no error, so every `net.minecraft.*` import fails to resolve and the first compile dies
+ * with a hundred "package net.minecraft.commands does not exist" errors.
+ *
+ * This task rebuilds the merged jar with our own sequential merger (tools/MergeJars.java) and drops
+ * it into every place Loom has already written the empty one, so the compile classpath picks it up.
+ * It is a no-op once a real jar is in place, and it regenerates from the two source jars whenever
+ * Loom re-downloads them, so it survives `--refresh-dependencies` and a wiped user cache.
+ */
+tasks.register('ensureMergedMinecraftJar') {
+    description = 'Rebuilds Loom\'s empty Minecraft merged jar so the compile classpath resolves.'
+    group = 'fabric'
+
+    // Captured now: a task action must not reach back into the project to find services.
+    def toolchains = javaToolchains
+
+    // Same rule as Loom's MinecraftProvider#minecraftWorkingDirectory.
+    def workingDir = new File(gradle.gradleUserHomeDir, "caches/fabric-loom/${project.minecraft_version}")
+    def clientJar = new File(workingDir, 'minecraft-client.jar')
+    def serverJar = new File(workingDir, 'minecraft-extracted_server.jar')
+    def mergedJar = new File(workingDir, 'minecraft-merged.jar')
+
+    inputs.files(clientJar, serverJar).optional()
+    outputs.file(mergedJar)
+
+    doLast {
+        // 22 bytes is Loom's empty archive; anything real is tens of megabytes.
+        boolean mergedOk = mergedJar.isFile() && mergedJar.length() > 1_000_000
+        if (!mergedOk) {
+            if (!clientJar.isFile() || !serverJar.isFile()) {
+                throw new GradleException(
+                        "Cannot rebuild the merged Minecraft jar: expected Loom's jars at "
+                                + "${clientJar} and ${serverJar}. Run a Loom task once so it downloads them.")
+            }
+            mergedJar.delete()
+            def javaExe = toolchains.launcherFor {
+                languageVersion = JavaLanguageVersion.of(25)
+            }.get().executablePath.asFile.absolutePath
+            def result = providers.exec {
+                executable javaExe
+                // Single-file source launch, so the tool needs no compile step of its own.
+                args new File(projectDir, 'tools/MergeJars.java').absolutePath,
+                        clientJar.absolutePath, serverJar.absolutePath, mergedJar.absolutePath
+            }
+            def output = result.standardOutput.asText.get().trim()
+            if (result.result.get().exitValue != 0) {
+                throw new GradleException("Merging the Minecraft jars failed: ${output}")
+            }
+            logger.lifecycle(output)
+        }
+
+        // Loom has usually already copied the empty jar into one or two maven caches. Gradle treats
+        // an overwritten file as a changed file, so it picks the real one up from here on. The
+        // artifact name carries a Loom-internal hash, so it is discovered rather than hardcoded.
+        def replacements = []
+        def mavenRoots = [
+                new File(projectDir, '.gradle/loom-cache/minecraftMaven'),
+                new File(gradle.gradleUserHomeDir, 'caches/fabric-loom/minecraftMaven'),
+        ]
+        mavenRoots.each { root ->
+            if (!root.isDirectory()) {
+                return
+            }
+            root.eachFileRecurse { file ->
+                if (file.isFile() && file.name.startsWith('minecraft-merged')
+                        && file.name.endsWith('.jar')) {
+                    replacements << file
+                }
+            }
+        }
+
+        replacements.each { target ->
+            // Rewriting a jar that is already correct would hand Gradle's artifact transforms a new
+            // input and make them rebuild, so only the stub copies are touched.
+            if (!target.isFile() || target.length() == mergedJar.length()) {
+                return
+            }
+            target.parentFile.mkdirs()
+            target.bytes = mergedJar.bytes
+            logger.lifecycle("Replaced empty Minecraft jar: ${target}")
+            // Loom's AbstractMappedMinecraftProvider#shouldRefreshOutputs re-processes and rewrites
+            // the jar whenever its `.backup` sibling is missing, and that rewrite is what trips over
+            // the read-only zip filesystem. Keeping the backup in step with the jar is what makes a
+            // second build behave like the first.
+            def backup = new File(target.absolutePath + '.backup')
+            backup.bytes = mergedJar.bytes
+        }
+    }
+}
+
+// Must run before javac reads the classpath, but declaring the configuration itself would create a
+// cycle.
+tasks.matching { it.name == 'compileJava' }.configureEach {
+    dependsOn 'ensureMergedMinecraftJar'
+}
+
+// A dedicated server and a client that walks straight into it, so the mod can be exercised in the
+// configuration it was written for. `gradlew runClient` on its own starts a client with no world;
+// this pair is what makes an end-to-end run one command each.
+loom {
+    runs {
+        server {
+            runDir 'run/server'
+            programArgs '--nogui'
+        }
+        client {
+            runDir 'run/client'
+            // Joins the server above as soon as the client reaches its main menu.
+            programArgs '--quickPlayMultiplayer', 'localhost:25599'
+        }
+    }
+}
+
+/*
+ * Automated in-game verification.
+ *
+ * `src/gametest` is a separate source set that Loom turns into its own test mod, so nothing here is
+ * ever packaged into the released jar: the checks need the client to open its own singleplayer
+ * world, which only a real client can do.
+ *
+ * `clearRunDirectory = false` keeps the run directory (and therefore the accepted EULA next to it)
+ * across runs; `username` pins the offline name the checks log in as, so a failure can be
+ * reproduced by rerunning `gradlew runClientGametest` alone.
+ */
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = 'commandgrants-gametest'
+        enableGameTests = false
+        enableClientGameTests = true
+        clearRunDirectory = false
+        username = 'Player611'
+    }
+}

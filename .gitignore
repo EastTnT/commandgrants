@@ -1,0 +1,25 @@
+# Gradle / build output
+.gradle/
+build/
+out/
+
+# Local caches created by the agent tooling (downloaded jars, decompiled sources)
+.cache/
+
+# Development runtime: the dev client/server worlds and their logs
+run/
+log/
+
+# One-off Java probes used while reverse-engineering the 26.2 classes
+tools/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# OS
+Thumbs.db
+desktop.ini

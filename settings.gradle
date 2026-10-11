@@ -1,0 +1,16 @@
+pluginManagement {
+    repositories {
+        // Primary: Fabric's own Maven (reachable from this machine).
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        // Mirrors kept as a safety net for networks that cannot reach the CDNs above.
+        maven { url = 'https://maven.aliyun.com/repository/gradle-plugin' }
+        maven { url = 'https://maven.aliyun.com/repository/public' }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'commandgrants'

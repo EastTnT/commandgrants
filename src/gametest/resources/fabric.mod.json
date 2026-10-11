@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "commandgrants-gametest",
+  "version": "1.0.0",
+  "name": "CommandGrants Client GameTests",
+  "description": "In-game checks for CommandGrants: the LAN sharing screen, the filtered command tree, and the server-side execution gate.",
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": [
+      "com.example.commandgrants.gametest.CommandGrantsClientGameTest"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "commandgrants": "*"
+  }
+}
