@@ -26,6 +26,13 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # gradlew arrived on this repository without its executable bit, so a fresh checkout on a
+      # Linux runner cannot run it ("Permission denied", exit 126). The bit is also set in the
+      # index (git update-index --chmod=+x gradlew); this step keeps CI working even if some
+      # later clone or archive drops the mode again.
+      - name: Make the wrapper executable
+        run: chmod +x gradlew
+
       # Loom 1.18.2 writes an empty (22-byte) minecraft-merged.jar for 26.2 on the very first
       # run, and the first run also trips over the missing .backup sibling of that stub. The
       # repository's ensureMergedMinecraftJar task repairs both, but only on the run *after*
