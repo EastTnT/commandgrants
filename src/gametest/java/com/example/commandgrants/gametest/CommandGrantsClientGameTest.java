@@ -648,7 +648,7 @@ public final class CommandGrantsClientGameTest implements FabricClientGameTest {
                 GrantTable shortNameGrants = manager.table(GUEST);
                 String longNameShut = refusal(
                         access.narrowDispatcher(probe, guestBase, full, shortNameGrants, index),
-                        guestSource, "teleport EastTnT 0 0 0");
+                        guestSource, "teleport Steve 0 0 0");
                 if (longNameShut != null) {
                     throw new AssertionError("A guest who was given /tp cannot use /teleport: "
                             + longNameShut

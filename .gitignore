@@ -10,9 +10,6 @@ out/
 run/
 log/
 
-# One-off Java probes used while reverse-engineering the 26.2 classes
-tools/
-
 # IDE
 .idea/
 *.iml

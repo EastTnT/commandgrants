@@ -1,5 +1,10 @@
 # CommandGrants
 
+[![构建](https://github.com/EastTnT/commandgrants/actions/workflows/build.yml/badge.svg)](https://github.com/EastTnT/commandgrants/actions/workflows/build.yml)
+[![许可: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Minecraft 26.2](https://img.shields.io/badge/Minecraft-26.2-62b47a.svg)](https://www.minecraft.net/)
+[![加载器: Fabric](https://img.shields.io/badge/loader-Fabric-dbb69c.svg)](https://fabricmc.net/)
+
 在**关闭作弊**的情况下，让主机把一部分指令权限开放给指定玩家。
 
 原版只有「允许作弊」这一个总开关：要么所有人（含自己）拿到全部指令，要么谁都没有。这个模组把它拆成**按玩家、按指令**的细粒度授权，房主照样可以不开作弊。
@@ -8,6 +13,17 @@
 - 加载器：Fabric Loader 0.19.5+
 - Java：25
 - 环境：单人/局域网房主、专用服务器管理员
+
+## 安装
+
+要**两端都装**：这个模组同时改了服务端（裁剪解析用的调度器）和客户端（收命令包时过滤补全），只装一边不会生效。
+
+1. 装 [Fabric Loader](https://fabricmc.net/use/installer/) 0.19.5 或更高，以及 [Fabric API](https://modrinth.com/mod/fabric-api) `0.161.0+26.2`；
+2. 把 `commandgrants-1.0.0.jar` 和 Fabric API 一起放进 `mods/`；
+3. 客户端用 Java 25 启动（26.2 的要求），进世界后在「对局域网开放」里就能看到按钮。
+
+专用服务器：同样放进 `mods/`，`server.properties` 里把 `allow-cheats` **保持 `false`**，用下面那组 `/commandgrants` 指令维护授权（需要 op）。
+
 
 ## 它做了什么
 
