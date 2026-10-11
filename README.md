@@ -202,6 +202,21 @@ public final class PermissionProviderCheck<T extends PermissionSetSupplier> impl
 
 行宽的正确写法是在控件自己身上给：`Checkbox.builder(...).maxWidth(OPTION_WIDTH)`，然后 `rows.addChild(checkbox)` 一个参数。
 
+## English
+
+Vanilla has one switch for commands: allow cheats and everyone at permission level 2+ gets all of
+them, deny them and nobody gets anything. CommandGrants splits that into per-player, per-command
+grants, so a host can stay on `allow-cheats=false` and still hand out exactly the commands a guest
+needs.
+
+- **Requirements**: Minecraft 26.2, Fabric Loader 0.19.5+, Java 25, [Fabric API](https://modrinth.com/mod/fabric-api) `0.161.0+26.2`.
+- **Install**: put the jar from [Releases](https://github.com/EastTnT/commandgrants/releases) and Fabric API into `mods/` on **both** the client and the server — one half alone does nothing.
+- **Use**: in single player or on a LAN world, pick commands per player from the button in the **Open to LAN** screen; on a dedicated server, keep `allow-cheats=false` and manage grants with `/commandgrants` (operator only).
+
+The rest of this README is in Chinese and goes into the implementation: which layer actually
+enforces the grant, why the command tree has to be filtered when the packet is built, and what each
+of the subtle bits (redirect aliases, layout, the two-pass build) is there for.
+
 ## 许可
 
 MIT，见 `LICENSE`。
